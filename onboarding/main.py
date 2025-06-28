@@ -41,7 +41,10 @@ def process_csv(input_file='input.csv'):
         start_time = str(row.get('start', '')).strip()
         end_time = str(row.get('end', '')).strip()
 
-        safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '_')).rstrip()
+        safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '_')).strip()
+        if not safe_title:
+            print(f"Warning: Could not generate a valid directory name from title '{title}'. Using 'default_video_title'.")
+            safe_title = "default_video_title"
         output_dir = safe_title
         os.makedirs(output_dir, exist_ok=True)
 
@@ -70,7 +73,10 @@ def process_csv(input_file='input.csv'):
             print(f"Failed to get video for {video_link}")
             continue
 
-        safe_topic = "".join(c for c in topic if c.isalnum() or c in (' ', '_')).rstrip()
+        safe_topic = "".join(c for c in topic if c.isalnum() or c in (' ', '_')).strip()
+        if not safe_topic:
+            print(f"Warning: Could not generate a valid clip name from topic '{topic}'. Using a default name.")
+            safe_topic = f"clip_{index}"
         output_clip_path = os.path.join(output_dir, f"{safe_topic}.mp4")
 
         print(f"Creating clip: {output_clip_path} from {start_time} to {end_time}")
