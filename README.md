@@ -3,8 +3,11 @@ Download and Generate stitched clips from Session links
 
 ## Setup Instructions
 
-### 1. Install ffmpeg
-This project requires the `ffmpeg` command-line tool.
+### 1. Install Poetry
+This project uses [Poetry](https://python-poetry.org/) for dependency management. If you don't have it, follow the [official installation guide](https://python-poetry.org/docs/#installation).
+
+### 2. Install ffmpeg
+This project requires the `ffmpeg` command-line tool. The version used for development was `7.1.1_3`.
 
 If you are on macOS and have [Homebrew](https://brew.sh/) installed, you can install it by running:
 ```sh
@@ -12,17 +15,15 @@ brew install ffmpeg
 ```
 For other operating systems, please see the official [ffmpeg download page](https://ffmpeg.org/download.html).
 
-### 2. Create and activate Python virtual environment
-It is recommended to use a virtual environment to manage project dependencies.
-
+### 3. Install Dependencies
+This command will create a virtual environment and install all Python dependencies from `pyproject.toml`.
 ```sh
-python3 -m venv onboarding
-source onboarding/bin/activate
+poetry install
 ```
-After running the `source` command, your shell prompt should indicate that you are in the `(onboarding)` environment.
 
-### 3. Install Python dependencies
-With the virtual environment activated, install the required Python packages:
+### 4. Activate Virtual Environment
+To work within the project's virtual environment, run:
 ```sh
-pip install ffmpeg-python
+poetry shell
 ```
+This will spawn a new shell within the virtual environment.
