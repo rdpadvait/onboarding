@@ -45,7 +45,7 @@ def process_csv(input_file='input.csv'):
         if not safe_title:
             print(f"Warning: Could not generate a valid directory name from title '{title}'. Using 'default_video_title'.")
             safe_title = "default_video_title"
-        output_dir = safe_title
+        output_dir = os.path.join('output', safe_title)
         os.makedirs(output_dir, exist_ok=True)
 
         downloaded_video_path = downloaded_videos.get(video_link)
