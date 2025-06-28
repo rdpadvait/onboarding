@@ -8,6 +8,10 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.12"
 ffmpeg-python = "^0.2.0"
+yt-dlp = "^2024.5.27"
+
+[tool.poetry.scripts]
+process-videos = "onboarding.main:main"
 
 [build-system]
 requires = ["poetry-core"]

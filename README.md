@@ -27,3 +27,10 @@ To work within the project's virtual environment, run:
 poetry shell
 ```
 This will spawn a new shell within the virtual environment.
+
+### 5. Running the script
+To process the `input.csv` and generate video clips, run:
+```sh
+poetry run process-videos
+```
+Make sure you have an `input.csv` file in the root of the project with columns: `title`, `video link`, `topic`, `start`, `end`. The output videos will be saved in directories named after the video titles.
