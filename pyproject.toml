@@ -9,6 +9,7 @@ readme = "README.md"
 python = "^3.12"
 ffmpeg-python = "^0.2.0"
 yt-dlp = "^2024.5.27"
+pandas = "^2.2.2"
 
 [tool.poetry.scripts]
 process-videos = "onboarding.main:main"
