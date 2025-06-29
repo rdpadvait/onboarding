@@ -53,7 +53,7 @@ def process_csv(input_file='input.csv'):
         if not downloaded_video_path or not os.path.exists(downloaded_video_path):
             ydl_opts = {
                 'outtmpl': os.path.join(output_dir, 'full_video.%(ext)s'),
-                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                'format': 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4][height<=480]/best[height<=480]',
                 'quiet': True,
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
