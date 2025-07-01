@@ -51,7 +51,7 @@ def crop_to_square_with_face_detection(input_path, output_path):
     # Cropping parameters
     current_crop_x = (width - new_width) // 2
     # Only change crop position if face moves more than this percentage of frame width
-    movement_threshold = new_width * 0.15
+    movement_threshold = new_width * 0.30
 
     print("Starting dynamic crop with face detection...")
 
