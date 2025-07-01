@@ -3,12 +3,95 @@ import ffmpeg
 import yt_dlp
 import pandas as pd
 import numpy as np
+import cv2
+import shutil
+
+def crop_to_square_with_face_detection(input_path, output_path):
+    """
+    Crops a video to a square (1:1) aspect ratio, trying to keep a detected face in the center.
+    If the video is already square or portrait, it is copied without changes.
+    """
+    try:
+        probe = ffmpeg.probe(input_path)
+        video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
+        if video_stream is None:
+            print("No video stream found.")
+            raise ValueError("No video stream in file")
+        
+        width = int(video_stream['width'])
+        height = int(video_stream['height'])
+    except ffmpeg.Error as e:
+        print(f"Error probing video: {e.stderr.decode()}")
+        raise
+
+    # Desired square aspect ratio
+    new_width = height
+
+    if new_width >= width:
+        print("Video is already square or portrait, skipping crop.")
+        shutil.copy(input_path, output_path)
+        return
+
+    # Load face detector
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    if face_cascade.empty():
+        raise IOError("Unable to load the face cascade classifier xml file")
+
+    cap = cv2.VideoCapture(input_path)
+    if not cap.isOpened():
+        raise IOError(f"Cannot open video file {input_path}")
+
+    face_x_positions = []
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    # Sample a few frames to find face
+    sample_frames = [int(frame_count * i / 10) for i in range(1, 10)]
+
+    for frame_num in sample_frames:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
+        ret, frame = cap.read()
+        if not ret:
+            continue
+        
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+        
+        if len(faces) > 0:
+            # Use the first detected face
+            x, y, w, h = faces[0]
+            face_x_positions.append(x + w // 2)
+
+    cap.release()
+
+    if not face_x_positions:
+        print("No faces detected. Cropping to the center.")
+        crop_x = (width - new_width) // 2
+    else:
+        # Average face position
+        avg_face_x = sum(face_x_positions) / len(face_x_positions)
+        crop_x = int(avg_face_x - new_width / 2)
+
+    # Clamp crop_x to be within video bounds
+    crop_x = max(0, min(crop_x, width - new_width))
+
+    print(f"Cropping video to square at x={crop_x} with width={new_width}")
+    try:
+        (
+            ffmpeg
+            .input(input_path)
+            .crop(crop_x, 0, new_width, height)
+            .output(output_path)
+            .run(overwrite_output=True, quiet=True)
+        )
+    except ffmpeg.Error as e:
+        print(f"Error cropping video: {e.stderr.decode()}")
+        raise
 
 def process_csv(input_file='input.csv'):
     """
     Processes a CSV file to download and cut video clips.
     """
     downloaded_videos = {}  # Cache for {video_link: path}
+    cropped_videos = {}  # Cache for {video_link: cropped_path}
 
     if not os.path.exists(input_file):
         print(f"Error: Input file not found at {input_file}")
@@ -73,6 +156,21 @@ def process_csv(input_file='input.csv'):
             print(f"Failed to get video for {video_link}")
             continue
 
+        video_to_clip_path = cropped_videos.get(video_link)
+        if not video_to_clip_path or not os.path.exists(video_to_clip_path):
+            squarish_video_path = os.path.join(output_dir, 'full_video_squarish.mp4')
+            print(f"Creating squarish version of {video_link}")
+            try:
+                crop_to_square_with_face_detection(downloaded_video_path, squarish_video_path)
+                print(f"Successfully created squarish video: {squarish_video_path}")
+                video_to_clip_path = squarish_video_path
+                cropped_videos[video_link] = video_to_clip_path
+            except Exception as e:
+                print(f"Failed to crop video to square: {e}. Using original video for clipping.")
+                video_to_clip_path = downloaded_video_path
+        else:
+            print(f"Using cached squarish video: {video_to_clip_path}")
+
         safe_topic = "".join(c for c in topic if c.isalnum() or c in (' ', '_')).strip()
         if not safe_topic:
             print(f"Warning: Could not generate a valid clip name from topic '{topic}'. Using a default name.")
@@ -83,7 +181,7 @@ def process_csv(input_file='input.csv'):
         try:
             (
                 ffmpeg
-                .input(downloaded_video_path, ss=start_time, to=end_time)
+                .input(video_to_clip_path, ss=start_time, to=end_time)
                 .output(output_clip_path, c='copy')
                 .run(overwrite_output=True, quiet=True)
             )
@@ -93,7 +191,7 @@ def process_csv(input_file='input.csv'):
             try:
                 (
                     ffmpeg
-                    .input(downloaded_video_path, ss=start_time, to=end_time)
+                    .input(video_to_clip_path, ss=start_time, to=end_time)
                     .output(output_clip_path)
                     .run(overwrite_output=True, quiet=True)
                 )
