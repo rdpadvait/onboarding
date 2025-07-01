@@ -51,7 +51,11 @@ def crop_to_square_with_face_detection(input_path, output_path):
     # Cropping parameters
     current_crop_x = (width - new_width) // 2
     # Only change crop position if face moves more than this percentage of frame width
-    movement_threshold = new_width * 0.30
+    movement_threshold = new_width * 0.35
+    # Number of consecutive frames face must be out of bounds to trigger a re-crop
+    recrop_persistence_frames = 5
+    out_of_bounds_counter = 0
+    ideal_crop_x = current_crop_x
 
     print("Starting dynamic crop with face detection...")
 
@@ -71,10 +75,21 @@ def crop_to_square_with_face_detection(input_path, output_path):
             # Clamp crop_x to be within video bounds
             ideal_crop_x = max(0, min(ideal_crop_x, width - new_width))
 
-            # Only update crop position if face has moved significantly
+            # Check if face has moved significantly
             if abs(ideal_crop_x - current_crop_x) > movement_threshold:
-                current_crop_x = ideal_crop_x
+                out_of_bounds_counter += 1
+            else:
+                # Face is back in the zone, reset counter
+                out_of_bounds_counter = 0
+        else:
+            # No face detected, reset counter
+            out_of_bounds_counter = 0
         
+        # If the face has been consistently out of bounds, update the crop position
+        if out_of_bounds_counter >= recrop_persistence_frames:
+            current_crop_x = ideal_crop_x
+            out_of_bounds_counter = 0  # Reset after adjusting
+
         # Use integer for slicing
         crop_x = current_crop_x
         
