@@ -55,41 +55,53 @@ def crop_to_square_with_face_detection(input_path, output_path):
     safe_zone_start = safe_zone_padding
     safe_zone_end = new_width - safe_zone_padding
     # Number of consecutive frames face must be out of bounds to trigger a re-crop
-    recrop_persistence_frames = 100
+    recrop_persistence_frames = int(fps * 3)
     out_of_bounds_counter = 0
     ideal_crop_x = current_crop_x
 
     print("Starting dynamic crop with face detection...")
+
+    frame_number = 0
+    detection_interval = max(1, int(fps / 10))  # Detect at most 10 times per second
 
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
 
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+        # Only run face detection periodically
+        if frame_number % detection_interval == 0:
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            faces = face_cascade.detectMultiScale(gray, 1.1, 4)
 
-        if len(faces) > 0:
-            x, y, w, h = faces[0]  # Use the first detected face
-            face_center_x = x + w // 2
-            
-            # Calculate face position within the current crop
-            face_center_in_crop = face_center_x - current_crop_x
+            if len(faces) > 0:
+                x, y, w, h = faces[0]  # Use the first detected face
+                face_center_x = x + w // 2
 
-            # Check if face is outside the safe zone
-            if not (safe_zone_start < face_center_in_crop < safe_zone_end):
-                out_of_bounds_counter += 1
-                # Calculate the ideal crop position to re-center the face
-                ideal_crop_x = face_center_x - new_width // 2
-                # Clamp crop_x to be within video bounds
-                ideal_crop_x = max(0, min(ideal_crop_x, width - new_width))
+                # Calculate face position within the current crop
+                face_center_in_crop = face_center_x - current_crop_x
+
+                # Check if face is outside the safe zone
+                if not (safe_zone_start < face_center_in_crop < safe_zone_end):
+                    # Calculate the ideal crop position to re-center the face
+                    new_ideal_crop_x = face_center_x - new_width // 2
+                    # Clamp crop_x to be within video bounds
+                    new_ideal_crop_x = max(0, min(new_ideal_crop_x, width - new_width))
+
+                    # Trigger change only if shift is significant
+                    if abs(new_ideal_crop_x - current_crop_x) > (0.4 * width):
+                        ideal_crop_x = new_ideal_crop_x
+                        out_of_bounds_counter += detection_interval
+                    else:
+                        # Not a big enough shift, reset counter
+                        out_of_bounds_counter = 0
+                else:
+                    # Face is inside the safe zone, reset counter
+                    out_of_bounds_counter = 0
             else:
-                # Face is inside the safe zone, reset counter
+                # No face detected, assume it's in a good position
                 out_of_bounds_counter = 0
-        else:
-            # No face detected, assume it's in a good position
-            out_of_bounds_counter = 0
-        
+
         # If the face has been consistently out of bounds, update the crop position
         if out_of_bounds_counter >= recrop_persistence_frames:
             current_crop_x = ideal_crop_x
@@ -100,6 +112,8 @@ def crop_to_square_with_face_detection(input_path, output_path):
         
         cropped_frame = frame[:, crop_x : crop_x + new_width]
         out.write(cropped_frame)
+
+        frame_number += 1
 
     cap.release()
     out.release()
