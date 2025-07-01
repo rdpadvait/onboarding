@@ -6,9 +6,9 @@ import numpy as np
 import cv2
 import shutil
 
-def crop_to_square_with_upper_body_detection(input_path, output_path):
+def crop_to_square_with_face_detection(input_path, output_path):
     """
-    Crops a video to a square (1:1) aspect ratio, trying to keep a detected upper body in the center.
+    Crops a video to a square (1:1) aspect ratio, dynamically keeping a detected face in the center of each frame.
     If the video is already square or portrait, it is copied without changes.
     """
     try:
@@ -20,6 +20,8 @@ def crop_to_square_with_upper_body_detection(input_path, output_path):
         
         width = int(video_stream['width'])
         height = int(video_stream['height'])
+        fps = eval(video_stream.get('r_frame_rate', '30/1'))
+
     except ffmpeg.Error as e:
         print(f"Error probing video: {e.stderr.decode()}")
         raise
@@ -32,60 +34,66 @@ def crop_to_square_with_upper_body_detection(input_path, output_path):
         shutil.copy(input_path, output_path)
         return
 
-    # Load upper body detector
-    upper_body_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_upperbody.xml')
-    if upper_body_cascade.empty():
-        raise IOError("Unable to load the upper body cascade classifier xml file")
+    # Load face detector
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    if face_cascade.empty():
+        raise IOError("Unable to load the face cascade classifier xml file")
 
     cap = cv2.VideoCapture(input_path)
     if not cap.isOpened():
         raise IOError(f"Cannot open video file {input_path}")
 
-    upper_body_x_positions = []
-    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    # Sample a few frames to find upper body
-    sample_frames = [int(frame_count * i / 10) for i in range(1, 10)]
+    # Temporary path for video without audio
+    temp_video_path = output_path + ".tmp.mp4"
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(temp_video_path, fourcc, fps, (new_width, height))
 
-    for frame_num in sample_frames:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
+    last_crop_x = (width - new_width) // 2
+    print("Starting dynamic crop with face detection...")
+
+    while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
-            continue
-        
+            break
+
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        upper_bodies = upper_body_cascade.detectMultiScale(gray, 1.1, 4)
+        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+
+        if len(faces) > 0:
+            x, y, w, h = faces[0]  # Use the first detected face
+            face_center_x = x + w // 2
+            crop_x = face_center_x - new_width // 2
+            # Clamp crop_x to be within video bounds
+            crop_x = max(0, min(crop_x, width - new_width))
+            last_crop_x = crop_x
+        else:
+            # If no face detected, use the last known position
+            crop_x = last_crop_x
         
-        if len(upper_bodies) > 0:
-            # Use the first detected body
-            x, y, w, h = upper_bodies[0]
-            upper_body_x_positions.append(x + w // 2)
+        cropped_frame = frame[:, crop_x : crop_x + new_width]
+        out.write(cropped_frame)
 
     cap.release()
+    out.release()
+    print("Dynamic crop finished. Merging audio...")
 
-    if not upper_body_x_positions:
-        print("No upper bodies detected. Cropping to the center.")
-        crop_x = (width - new_width) // 2
-    else:
-        # Average body position
-        avg_body_x = sum(upper_body_x_positions) / len(upper_body_x_positions)
-        crop_x = int(avg_body_x - new_width / 2)
-
-    # Clamp crop_x to be within video bounds
-    crop_x = max(0, min(crop_x, width - new_width))
-
-    print(f"Cropping video to square at x={crop_x} with width={new_width}")
     try:
-        input_stream = ffmpeg.input(input_path)
-        video = input_stream.video.crop(crop_x, 0, new_width, height)
-        audio = input_stream.audio
+        input_video = ffmpeg.input(temp_video_path)
+        input_audio = ffmpeg.input(input_path).audio
         (
             ffmpeg
-            .output(video, audio, output_path, acodec='copy')
+            .output(input_video, input_audio, output_path, acodec='copy')
             .run(overwrite_output=True, quiet=True)
         )
+        print("Audio merged successfully.")
     except ffmpeg.Error as e:
-        print(f"Error cropping video: {e.stderr.decode()}")
-        raise
+        print(f"Error merging audio: {e.stderr.decode()}")
+        # If audio merge fails, copy the silent video as a fallback
+        shutil.copy(temp_video_path, output_path)
+    finally:
+        # Clean up temporary file
+        if os.path.exists(temp_video_path):
+            os.remove(temp_video_path)
 
 def process_csv(input_file='input.csv'):
     """
@@ -162,7 +170,7 @@ def process_csv(input_file='input.csv'):
             squarish_video_path = os.path.join(output_dir, 'full_video_squarish.mp4')
             print(f"Creating squarish version of {video_link}")
             try:
-                crop_to_square_with_upper_body_detection(downloaded_video_path, squarish_video_path)
+                crop_to_square_with_face_detection(downloaded_video_path, squarish_video_path)
                 print(f"Successfully created squarish video: {squarish_video_path}")
                 video_to_clip_path = squarish_video_path
                 cropped_videos[video_link] = video_to_clip_path
