@@ -50,8 +50,10 @@ def crop_to_square_with_face_detection(input_path, output_path):
 
     # Cropping parameters
     current_crop_x = (width - new_width) // 2
-    # Only change crop position if face moves more than this percentage of frame width
-    movement_threshold = new_width * 0.35
+    # Define a safe zone within the cropped frame (e.g., middle 50%)
+    safe_zone_padding = new_width * 0.25
+    safe_zone_start = safe_zone_padding
+    safe_zone_end = new_width - safe_zone_padding
     # Number of consecutive frames face must be out of bounds to trigger a re-crop
     recrop_persistence_frames = 5
     out_of_bounds_counter = 0
@@ -70,19 +72,22 @@ def crop_to_square_with_face_detection(input_path, output_path):
         if len(faces) > 0:
             x, y, w, h = faces[0]  # Use the first detected face
             face_center_x = x + w // 2
-            # Calculate the ideal crop position to center the face
-            ideal_crop_x = face_center_x - new_width // 2
-            # Clamp crop_x to be within video bounds
-            ideal_crop_x = max(0, min(ideal_crop_x, width - new_width))
+            
+            # Calculate face position within the current crop
+            face_center_in_crop = face_center_x - current_crop_x
 
-            # Check if face has moved significantly
-            if abs(ideal_crop_x - current_crop_x) > movement_threshold:
+            # Check if face is outside the safe zone
+            if not (safe_zone_start < face_center_in_crop < safe_zone_end):
                 out_of_bounds_counter += 1
+                # Calculate the ideal crop position to re-center the face
+                ideal_crop_x = face_center_x - new_width // 2
+                # Clamp crop_x to be within video bounds
+                ideal_crop_x = max(0, min(ideal_crop_x, width - new_width))
             else:
-                # Face is back in the zone, reset counter
+                # Face is inside the safe zone, reset counter
                 out_of_bounds_counter = 0
         else:
-            # No face detected, reset counter
+            # No face detected, assume it's in a good position
             out_of_bounds_counter = 0
         
         # If the face has been consistently out of bounds, update the crop position
