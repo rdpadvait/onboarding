@@ -75,11 +75,12 @@ def crop_to_square_with_face_detection(input_path, output_path):
 
     print(f"Cropping video to square at x={crop_x} with width={new_width}")
     try:
+        input_stream = ffmpeg.input(input_path)
+        video = input_stream.video.crop(crop_x, 0, new_width, height)
+        audio = input_stream.audio
         (
             ffmpeg
-            .input(input_path)
-            .crop(crop_x, 0, new_width, height)
-            .output(output_path)
+            .output(video, audio, output_path, acodec='copy')
             .run(overwrite_output=True, quiet=True)
         )
     except ffmpeg.Error as e:
