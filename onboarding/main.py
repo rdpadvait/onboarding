@@ -48,7 +48,10 @@ def crop_to_square_with_face_detection(input_path, output_path):
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(temp_video_path, fourcc, fps, (new_width, height))
 
-    last_crop_x = (width - new_width) // 2
+    # Smoothing parameters
+    current_crop_x = (width - new_width) / 2.0
+    smoothing_factor = 0.1  # Lower value = smoother, but more lag.
+
     print("Starting dynamic crop with face detection...")
 
     while cap.isOpened():
@@ -59,16 +62,21 @@ def crop_to_square_with_face_detection(input_path, output_path):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = face_cascade.detectMultiScale(gray, 1.1, 4)
 
+        target_crop_x = current_crop_x
+
         if len(faces) > 0:
             x, y, w, h = faces[0]  # Use the first detected face
             face_center_x = x + w // 2
-            crop_x = face_center_x - new_width // 2
+            # Calculate the ideal crop position to center the face
+            ideal_crop_x = face_center_x - new_width // 2
             # Clamp crop_x to be within video bounds
-            crop_x = max(0, min(crop_x, width - new_width))
-            last_crop_x = crop_x
-        else:
-            # If no face detected, use the last known position
-            crop_x = last_crop_x
+            target_crop_x = max(0, min(ideal_crop_x, width - new_width))
+        
+        # Smoothly adjust the current crop position towards the target
+        current_crop_x += (target_crop_x - current_crop_x) * smoothing_factor
+        
+        # Use integer for slicing
+        crop_x = int(round(current_crop_x))
         
         cropped_frame = frame[:, crop_x : crop_x + new_width]
         out.write(cropped_frame)
