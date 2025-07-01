@@ -137,7 +137,6 @@ def process_csv(input_file='input.csv'):
     Processes a CSV file to download and cut video clips.
     """
     downloaded_videos = {}  # Cache for {video_link: path}
-    cropped_videos = {}  # Cache for {video_link: cropped_path}
 
     if not os.path.exists(input_file):
         print(f"Error: Input file not found at {input_file}")
@@ -180,21 +179,27 @@ def process_csv(input_file='input.csv'):
         downloaded_video_path = downloaded_videos.get(video_link)
 
         if not downloaded_video_path or not os.path.exists(downloaded_video_path):
-            ydl_opts = {
-                'outtmpl': os.path.join(output_dir, 'full_video.%(ext)s'),
-                'format': 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4][height<=480]/best[height<=480]',
-                'quiet': True,
-            }
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                try:
-                    print(f"Downloading video from: {video_link}")
-                    info = ydl.extract_info(video_link, download=True)
-                    downloaded_video_path = ydl.prepare_filename(info)
-                    downloaded_videos[video_link] = downloaded_video_path
-                    print(f"Downloaded to: {downloaded_video_path}")
-                except yt_dlp.utils.DownloadError as e:
-                    print(f"Error downloading {video_link}: {e}")
-                    continue
+            potential_path = os.path.join(output_dir, 'full_video.mp4')
+            if os.path.exists(potential_path):
+                print(f"Using existing video on disk: {potential_path}")
+                downloaded_video_path = potential_path
+                downloaded_videos[video_link] = downloaded_video_path
+            else:
+                ydl_opts = {
+                    'outtmpl': os.path.join(output_dir, 'full_video.%(ext)s'),
+                    'format': 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4][height<=480]/best[height<=480]',
+                    'quiet': True,
+                }
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    try:
+                        print(f"Downloading video from: {video_link}")
+                        info = ydl.extract_info(video_link, download=True)
+                        downloaded_video_path = ydl.prepare_filename(info)
+                        downloaded_videos[video_link] = downloaded_video_path
+                        print(f"Downloaded to: {downloaded_video_path}")
+                    except yt_dlp.utils.DownloadError as e:
+                        print(f"Error downloading {video_link}: {e}")
+                        continue
         else:
             print(f"Using cached video: {downloaded_video_path}")
 
@@ -202,20 +207,15 @@ def process_csv(input_file='input.csv'):
             print(f"Failed to get video for {video_link}")
             continue
 
-        video_to_clip_path = cropped_videos.get(video_link)
-        if not video_to_clip_path or not os.path.exists(video_to_clip_path):
-            squarish_video_path = os.path.join(output_dir, 'full_video_squarish.mp4')
-            print(f"Creating squarish version of {video_link}")
-            try:
-                crop_to_square_with_face_detection(downloaded_video_path, squarish_video_path)
-                print(f"Successfully created squarish video: {squarish_video_path}")
-                video_to_clip_path = squarish_video_path
-                cropped_videos[video_link] = video_to_clip_path
-            except Exception as e:
-                print(f"Failed to crop video to square: {e}. Using original video for clipping.")
-                video_to_clip_path = downloaded_video_path
-        else:
-            print(f"Using cached squarish video: {video_to_clip_path}")
+        squarish_video_path = os.path.join(output_dir, 'full_video_squarish.mp4')
+        print(f"Creating squarish version of {video_link}")
+        try:
+            crop_to_square_with_face_detection(downloaded_video_path, squarish_video_path)
+            print(f"Successfully created squarish video: {squarish_video_path}")
+            video_to_clip_path = squarish_video_path
+        except Exception as e:
+            print(f"Failed to crop video to square: {e}. Using original video for clipping.")
+            video_to_clip_path = downloaded_video_path
 
         safe_topic = "".join(c for c in topic if c.isalnum() or c in (' ', '_')).strip()
         if not safe_topic:
