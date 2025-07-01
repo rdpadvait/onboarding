@@ -50,12 +50,12 @@ def crop_to_square_with_face_detection(input_path, output_path):
 
     # Cropping parameters
     current_crop_x = (width - new_width) // 2
-    # Define a safe zone within the cropped frame (e.g., middle 50%)
-    safe_zone_padding = new_width * 0.25
+    # Define a safe zone within the cropped frame (e.g., middle 40%)
+    safe_zone_padding = new_width * 0.3
     safe_zone_start = safe_zone_padding
     safe_zone_end = new_width - safe_zone_padding
     # Number of consecutive frames face must be out of bounds to trigger a re-crop
-    recrop_persistence_frames = int(fps * 3)
+    recrop_persistence_frames = int(fps * 1.5)
     out_of_bounds_counter = 0
     ideal_crop_x = current_crop_x
 
@@ -83,18 +83,13 @@ def crop_to_square_with_face_detection(input_path, output_path):
 
                 # Check if face is outside the safe zone
                 if not (safe_zone_start < face_center_in_crop < safe_zone_end):
-                    # Calculate the ideal crop position to re-center the face
+                    # Face is out of the safe zone, so we increment the counter and
+                    # update the ideal crop position to re-center the face.
+                    out_of_bounds_counter += detection_interval
+                    
                     new_ideal_crop_x = face_center_x - new_width // 2
                     # Clamp crop_x to be within video bounds
-                    new_ideal_crop_x = max(0, min(new_ideal_crop_x, width - new_width))
-
-                    # Trigger change only if shift is significant
-                    if abs(new_ideal_crop_x - current_crop_x) > (0.4 * width):
-                        ideal_crop_x = new_ideal_crop_x
-                        out_of_bounds_counter += detection_interval
-                    else:
-                        # Not a big enough shift, reset counter
-                        out_of_bounds_counter = 0
+                    ideal_crop_x = max(0, min(new_ideal_crop_x, width - new_width))
                 else:
                     # Face is inside the safe zone, reset counter
                     out_of_bounds_counter = 0
