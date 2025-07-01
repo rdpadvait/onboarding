@@ -6,9 +6,9 @@ import numpy as np
 import cv2
 import shutil
 
-def crop_to_square_with_face_detection(input_path, output_path):
+def crop_to_square_with_body_detection(input_path, output_path):
     """
-    Crops a video to a square (1:1) aspect ratio, trying to keep a detected face in the center.
+    Crops a video to a square (1:1) aspect ratio, trying to keep a detected body in the center.
     If the video is already square or portrait, it is copied without changes.
     """
     try:
@@ -32,16 +32,16 @@ def crop_to_square_with_face_detection(input_path, output_path):
         shutil.copy(input_path, output_path)
         return
 
-    # Load face detector
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    if face_cascade.empty():
-        raise IOError("Unable to load the face cascade classifier xml file")
+    # Load body detector
+    body_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_fullbody.xml')
+    if body_cascade.empty():
+        raise IOError("Unable to load the body cascade classifier xml file")
 
     cap = cv2.VideoCapture(input_path)
     if not cap.isOpened():
         raise IOError(f"Cannot open video file {input_path}")
 
-    face_x_positions = []
+    body_x_positions = []
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     # Sample a few frames to find face
     sample_frames = [int(frame_count * i / 10) for i in range(1, 10)]
@@ -53,22 +53,22 @@ def crop_to_square_with_face_detection(input_path, output_path):
             continue
         
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+        bodies = body_cascade.detectMultiScale(gray, 1.1, 4)
         
-        if len(faces) > 0:
-            # Use the first detected face
-            x, y, w, h = faces[0]
-            face_x_positions.append(x + w // 2)
+        if len(bodies) > 0:
+            # Use the first detected body
+            x, y, w, h = bodies[0]
+            body_x_positions.append(x + w // 2)
 
     cap.release()
 
-    if not face_x_positions:
-        print("No faces detected. Cropping to the center.")
+    if not body_x_positions:
+        print("No bodies detected. Cropping to the center.")
         crop_x = (width - new_width) // 2
     else:
-        # Average face position
-        avg_face_x = sum(face_x_positions) / len(face_x_positions)
-        crop_x = int(avg_face_x - new_width / 2)
+        # Average body position
+        avg_body_x = sum(body_x_positions) / len(body_x_positions)
+        crop_x = int(avg_body_x - new_width / 2)
 
     # Clamp crop_x to be within video bounds
     crop_x = max(0, min(crop_x, width - new_width))
@@ -162,7 +162,7 @@ def process_csv(input_file='input.csv'):
             squarish_video_path = os.path.join(output_dir, 'full_video_squarish.mp4')
             print(f"Creating squarish version of {video_link}")
             try:
-                crop_to_square_with_face_detection(downloaded_video_path, squarish_video_path)
+                crop_to_square_with_body_detection(downloaded_video_path, squarish_video_path)
                 print(f"Successfully created squarish video: {squarish_video_path}")
                 video_to_clip_path = squarish_video_path
                 cropped_videos[video_link] = video_to_clip_path
