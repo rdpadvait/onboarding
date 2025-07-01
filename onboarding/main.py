@@ -55,7 +55,7 @@ def crop_to_square_with_face_detection(input_path, output_path):
     safe_zone_start = safe_zone_padding
     safe_zone_end = new_width - safe_zone_padding
     # Number of consecutive frames face must be out of bounds to trigger a re-crop
-    recrop_persistence_frames = 5
+    recrop_persistence_frames = 100
     out_of_bounds_counter = 0
     ideal_crop_x = current_crop_x
 

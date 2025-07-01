@@ -34,3 +34,11 @@ To process the `input.csv` and generate video clips, run:
 poetry run process-videos
 ```
 Make sure you have an `input.csv` file in the root of the project with columns: `title`, `video link`, `topic`, `start`, `end`. The output videos will be saved in directories named after the video titles.
+
+## Important Notes
+Imp. variables
+```
+movement_threshold = new_width *
+recrop_persistence_frames
+fps = eval(video_stream.get('r_frame_rate', '30/1'))
+```
