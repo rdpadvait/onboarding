@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "onboarding"
+version = "0.1.0"
+description = "Download and Generate stitched clips from Session links"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+ffmpeg-python = "^0.2.0"
+yt-dlp = "^2024.5.27"
+pandas = "^2.2.2"
+opencv-python = "^4.11.0.86"
+
+[tool.poetry.scripts]
+process-videos = "onboarding.main:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
